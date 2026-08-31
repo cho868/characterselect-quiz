@@ -57,8 +57,11 @@
   .cell b{display:block;font-weight:700;color:var(--ok);font-size:9px;margin-top:2px}
 
   .row{display:flex;gap:5px;justify-content:center;width:100%}
-  .row .cell{flex:1 1 0;min-width:0;min-height:48px;font-size:10.5px;
-    box-shadow:2px 2px 0 var(--tile-lo)}
+  .row .cell,.row .spacer{flex:1 1 0;min-width:0}
+  .row.grid>.cell,.row.grid>.spacer{flex:0 0 calc((100% - (var(--cols) - 1) * 5px) / var(--cols))}
+  .row .cell{min-height:48px;font-size:10.5px;box-shadow:2px 2px 0 var(--tile-lo)}
+  .cell.locked{background:var(--tile-lo);color:#5f5a86;cursor:default;font-size:9.5px;
+    box-shadow:none}
 
   .circlewrap{position:relative;width:100%;display:flex;justify-content:center}
   .ringbox{position:relative;transform-origin:top center}
@@ -182,6 +185,62 @@ const DATA = [
           "聖ソル|ホーリーオーダーソル|オーダーソル|オーソル","ジャスティス","クリフ"]}
       ]}
     ]
+  },
+  {
+    id:"dkr", name:"ディディーコングレーシング", meta:"1997 / 10名", verified:true,
+    parts:[
+      {type:"row", w:520, names:[
+        "クランチ","ディディー|ディディーコング","ドラムスティック","バンパー","バンジョー"]},
+      {type:"row", w:520, names:[
+        "コンカー","ティップタップ","T.T|TT|ティーティー","ピプシー","ティンバー"]}
+    ]
+  },
+  {
+    id:"puyosun", name:"ぷよぷよSUN", meta:"1997 / 18名", verified:true,
+    parts:[
+      {type:"row", w:540, names:["カーバンクル|カーくん", null, null, "サタン"]},
+      {type:"row", w:540, names:[
+        "そう大魔王|ぞうだいまおう","ウィッチ","ハーピー","ハニービー"]},
+      {type:"row", w:540, names:[
+        "勇者ラグナス・ビシャシ|ラグナス|勇者ラグナス|ラグナスビシャシ",
+        "すけとうだら","インキュバス","コドモドラゴン"]},
+      {type:"row", w:540, names:[
+        "スケルトンT|スケルトンティー","ちょっぷん","のほほ","キキーモラ"]},
+      {type:"row", w:540, names:[
+        "ドラコケンタウロス|ドラコ","アルル|アルル・ナジャ|アルルナジャ",
+        "シェゾ|シェゾ・ウィグィィ|シェゾウィグィィ","ルルー"]}
+    ]
+  },
+  {
+    id:"bladestrangers", name:"ブレードストレンジャーズ", meta:"2018 / 17名", verified:true,
+    parts:[
+      {type:"row", w:560, cols:5, names:[
+        "ソランジュ|Solange","アリー|Ali","ライオンゲート|Liongate",
+        "マスターT|Master T","カーリー|カーリーブレイス|Curly Brace"]},
+      {type:"row", w:560, cols:5, names:[
+        "海腹川背|川背|Kawase","横山埜鼓|ノッコ|Noko","=ランダム",
+        "江美子|エミコ|Emiko","ヘレン|Helen"]},
+      {type:"row", w:560, cols:5, names:[
+        "ショベルナイト|Shovel Knight","ガンヴォルト|Gunvolt","リナ|Lina",
+        "アイザック|Isaac","クォート|Quote"]},
+      {type:"row", w:560, cols:5, names:[
+        "アバン|Aban","ピア|Pier","水着川背|サマー川背|Summer Kawase"]}
+    ]
+  },
+  {
+    id:"avatarlegends", name:"Avatar Legends", meta:"2026 / 12名（発売時）", verified:true,
+    parts:[
+      {type:"row", w:560, cols:5, names:[
+        "アバターアン|アバター アン|Avatar Aang"]},
+      {type:"row", w:560, cols:5, names:[
+        "ズーコ|Zuko","トフ|Toph","カタラ|Katara"]},
+      {type:"row", w:560, cols:5, names:[
+        "オザイ|Ozai","アン|Aang","=","コーラ|Korra","ザヒール|Zaheer"]},
+      {type:"row", w:560, cols:5, names:[
+        "ソッカ|Sokka","アズーラ|Azula","キヨシ|Kyoshi|Kiyoshi"]},
+      {type:"row", w:560, cols:5, names:[
+        "ナイトメアコーラ|ナイトメア コーラ|Nightmare Korra"]}
+    ]
   }
 ];
 
@@ -203,7 +262,8 @@ function norm(s){
 }
 const parse = s => { const p = String(s).split("|"); return {label:p[0], keys:p.map(norm)}; };
 const rawNames = g => g.parts.flatMap(p =>
-  p.type==="circle" ? p.rings.flatMap(r=>r.names) : p.names);
+  p.type==="circle" ? p.rings.flatMap(r=>r.names) : p.names)
+  .filter(n => n && String(n)[0]!=="=");
 const cellsOf = g => rawNames(g).map(parse);
 
 /* 自己ベスト。file:// や制限環境では黙って無効化 */
@@ -226,8 +286,12 @@ function board(g){
 
   const html = g.parts.map(part=>{
     if(part.type==="row"){
-      const style = part.w ? ` style="max-width:${part.w}px"` : "";
-      return `<div class="row"${style}>${part.names.map(()=>{ const p=i++;
+      const st = (part.w?`max-width:${part.w}px;`:"") + (part.cols?`--cols:${part.cols}`:"");
+      const cls = "row" + (part.cols?" grid":"");
+      return `<div class="${cls}"${st?` style="${st}"`:""}>${part.names.map(n=>{
+        if(!n) return `<div class="spacer"></div>`;
+        if(String(n)[0]==="=") return `<div class="cell locked">${esc(String(n).slice(1))}</div>`;
+        const p=i++;
         return `<button type="button" class="${klass(p)}" data-c="${p}">${inner(p)}</button>`;
       }).join("")}</div>`;
     }
@@ -235,12 +299,18 @@ function board(g){
     let t = "";
     for(const ring of part.rings){
       const step = 360/ring.names.length;
-      ring.names.forEach((_,k)=>{
+      ring.names.forEach((nm,k)=>{
+        if(!nm) return;
         const a = Array.isArray(ring.at) ? ring.at[k] : (ring.from||0) + step*k;
+        const pos = `width:${tw}px;height:${th}px;margin:${-th/2}px 0 0 ${-tw/2}px;`
+                  + `transform:rotate(${a}deg) translateY(${-ring.r}px);--back:${-a}deg`;
+        if(String(nm)[0]==="="){
+          t += `<div class="cell locked rt" style="${pos}">`
+             + `<span class="lb">${esc(String(nm).slice(1))}</span></div>`;
+          return;
+        }
         const p = i++;
-        t += `<button type="button" class="${klass(p)} rt" data-c="${p}" style="width:${tw}px;`
-           + `height:${th}px;margin:${-th/2}px 0 0 ${-tw/2}px;`
-           + `transform:rotate(${a}deg) translateY(${-ring.r}px);--back:${-a}deg">`
+        t += `<button type="button" class="${klass(p)} rt" data-c="${p}" style="${pos}">`
            + `<span class="lb">${inner(p)}</span></button>`;
       });
     }
