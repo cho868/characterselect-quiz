@@ -68,6 +68,9 @@
     letter-spacing:.12em;color:var(--dim);text-align:center;line-height:1.4}
   .rt{position:absolute;left:50%;top:50%;clip-path:polygon(9% 0,91% 0,100% 100%,0 100%)}
   .rt>.lb{display:block;font-size:9.5px;transform:rotate(var(--back))}
+  /* clip-path は外側の ::after も切り落とすので、円のタイルは枠を内側に描く */
+  .rt.active{background:#3b3767}
+  .rt.active::after{inset:0;border-width:4px}
 
   /* ---- 手札 / 入力 ---- */
   .pool{margin-top:16px;display:flex;flex-wrap:wrap;gap:5px;justify-content:center;
