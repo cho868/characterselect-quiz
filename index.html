@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>キャラセレ記憶 — CHARA SELECT MEMORY</title>
+<style>
+  :root{
+    --bg:#15132a; --panel:#201e3c; --tile:#2f2c55; --tile-lo:#191634;
+    --edge:#453f75; --ink:#f4efe2; --dim:#8b86b8;
+    --p1:#e8402a; --amber:#f2b33d; --ok:#3fbf7f; --ng:#b8384a;
+    --jp:"Hiragino Kaku Gothic ProN","Yu Gothic Medium","Yu Gothic",Meiryo,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--jp);
+    min-height:100vh;display:flex;justify-content:center;padding:20px 14px 50px;
+    -webkit-font-smoothing:antialiased}
+  .cab{width:100%;max-width:680px}
+
+  .marquee{border:2px solid var(--tile);border-bottom-width:4px;background:var(--panel);
+    padding:12px 14px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .marquee h1{font-size:19px;font-weight:800;letter-spacing:.14em;line-height:1}
+  .marquee .sub{font-size:11px;color:var(--dim);letter-spacing:.24em}
+
+  .status{display:flex;gap:2px;margin-top:2px}
+  .status div{flex:1;background:var(--tile-lo);border:2px solid var(--tile);
+    padding:7px 10px;display:flex;justify-content:space-between;align-items:baseline}
+  .status .k{font-size:10px;letter-spacing:.2em;color:var(--dim)}
+  .status .v{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums}
+
+  .stage{background:var(--panel);border:2px solid var(--tile);border-top:none;padding:18px 14px 20px}
+  .stage.top{border-top:2px solid var(--tile)}
+
+  /* ---- 盤面 ---- */
+  .parts{display:flex;flex-direction:column;gap:8px;align-items:center}
+  .cell{background:repeating-linear-gradient(45deg,var(--tile-lo) 0 5px,#221f45 5px 10px);
+    border:1px solid var(--edge);color:var(--ink);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;line-height:1.15;word-break:break-all;position:relative;
+    cursor:pointer;font:inherit;padding:2px}
+  .cell.filled{background:var(--tile)}
+  .cell.over{border-color:var(--amber);background:#3b3767}
+  .cell.active::after{content:"";position:absolute;inset:-5px;border:3px solid var(--p1);
+    animation:blink .62s steps(2,start) infinite;pointer-events:none;z-index:5}
+  @keyframes blink{50%{opacity:.15}}
+  @media(prefers-reduced-motion:reduce){.cell.active::after{animation:none}}
+  .cell.hit{background:#1d3d2e;border-color:var(--ok);color:var(--ok)}
+  .cell.miss{background:#3a1c26;border-color:var(--ng);color:#ffb9c2}
+  .cell b{display:block;font-weight:700;color:var(--ok);font-size:9px;margin-top:2px}
+
+  .row{display:flex;gap:5px;justify-content:center;width:100%}
+  .row .cell{flex:1 1 0;min-width:0;min-height:48px;font-size:10.5px;
+    box-shadow:2px 2px 0 var(--tile-lo)}
+
+  .circlewrap{position:relative;width:100%;display:flex;justify-content:center}
+  .ringbox{position:relative;transform-origin:top center}
+  .ringbox .core{position:absolute;left:50%;top:50%;width:84px;height:84px;margin:-42px 0 0 -42px;
+    border-radius:50%;border:2px solid var(--edge);background:var(--tile-lo);
+    display:flex;align-items:center;justify-content:center;font-size:9.5px;
+    letter-spacing:.12em;color:var(--dim);text-align:center;line-height:1.4}
+  .rt{position:absolute;left:50%;top:50%;clip-path:polygon(9% 0,91% 0,100% 100%,0 100%)}
+  .rt>.lb{display:block;font-size:9.5px;transform:rotate(var(--back))}
+
+  /* ---- 手札 / 入力 ---- */
+  .pool{margin-top:16px;display:flex;flex-wrap:wrap;gap:5px;justify-content:center;
+    border-top:1px solid var(--tile);padding-top:14px}
+  .chip{font:inherit;font-size:12px;color:var(--ink);background:var(--tile);
+    border:1px solid var(--edge);box-shadow:2px 2px 0 var(--tile-lo);
+    padding:7px 10px;cursor:grab}
+  .chip:hover{background:#3b3767}
+  .chip.sel{background:var(--amber);color:#241a05;border-color:var(--amber);font-weight:700}
+  .chip:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+  .typer{margin-top:16px;border-top:1px solid var(--tile);padding-top:14px;display:flex;gap:6px}
+  .typer input{flex:1;font:inherit;font-size:15px;background:var(--tile-lo);color:var(--ink);
+    border:1px solid var(--edge);padding:11px 12px;min-width:0}
+  .typer input:focus{outline:2px solid var(--amber);outline-offset:-2px}
+  .hint{margin-top:9px;font-size:11.5px;color:var(--dim);text-align:center;line-height:1.7}
+
+  /* ---- 共通UI ---- */
+  .list{display:grid;gap:6px}
+  .list button{font:inherit;text-align:left;color:var(--ink);background:var(--panel);
+    border:2px solid var(--tile);border-left:5px solid var(--amber);padding:13px 15px;
+    cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .list button:hover{background:#2a2750}
+  .list button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+  .list button.col{flex-direction:column;align-items:flex-start;gap:0}
+  .list .nm{font-size:15px;font-weight:700}
+  .list .mt{font-size:11px;color:var(--dim);letter-spacing:.08em;white-space:nowrap;text-align:right}
+  .list .ds{font-size:11.5px;color:var(--dim);margin-top:4px;line-height:1.6}
+  .note{margin-top:16px;font-size:11.5px;line-height:1.75;color:var(--dim);
+    border-top:1px solid var(--tile);padding-top:12px}
+  .flag{color:var(--amber)}
+  .result{text-align:center;padding:22px 10px 6px}
+  .result .big{font-size:52px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+  .result .lbl{font-size:11px;letter-spacing:.26em;color:var(--dim);margin-bottom:8px}
+  .result .det{font-size:13px;color:var(--dim);margin-top:12px;line-height:1.8}
+  .bar{margin-top:18px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+  .bar button{font:inherit;font-size:13px;font-weight:700;color:var(--ink);background:var(--tile);
+    border:1px solid var(--edge);box-shadow:2px 2px 0 var(--tile-lo);padding:11px 20px;cursor:pointer}
+  .bar button.go{background:var(--amber);color:#241a05;border-color:var(--amber)}
+  .bar button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+  textarea{width:100%;height:340px;background:var(--tile-lo);color:var(--ink);
+    border:1px solid var(--edge);padding:10px;font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:12px;line-height:1.6;resize:vertical}
+  .msg{margin-top:10px;font-size:12px;min-height:1.2em}
+  .msg.bad{color:var(--p1)} .msg.good{color:var(--ok)}
+  .help{font-size:11.5px;line-height:1.8;color:var(--dim);margin-bottom:10px}
+  .help code{color:var(--amber);font-family:ui-monospace,monospace}
+  footer{margin-top:14px;font-size:10.5px;line-height:1.8;color:#5f5a86;text-align:center}
+</style>
+
+<body>
+<div class="cab">
+  <div class="marquee">
+    <h1>キャラセレ記憶</h1>
+    <span class="sub">CHARA SELECT MEMORY</span>
+  </div>
+  <div id="app"></div>
+  <footer>
+    非公式のファンメイド作品です。各タイトルの権利は権利者に帰属します。<br>
+    画像・ロゴ等は一切使用していません。
+  </footer>
+</div>
+
+<script>
+/* ==========================================================================
+   盤面データ
+   --------------------------------------------------------------------------
+   parts に「行」と「円」を上から順に積みます。
+     {type:"row",    w:470, names:[...]}
+        w … 行の最大幅(px)。省略すると横いっぱい。
+     {type:"circle", size:470, core:"中央の文字", rings:[...]}
+        rings … r=中心からの距離(px)、names=並べるキャラ。
+                from=開始角度(0が真上・時計回り)を指定すると等間隔。
+                at=[角度,…] を指定すると1枚ずつ好きな位置に置ける。
+                かたまりや弧を作りたいときは at を使う。
+   キャラ名は "表示名|別表記|別表記" と書くと別表記も正解になります。
+   ========================================================================== */
+const DATA = [
+  {
+    id:"smash64", name:"スマブラ64", meta:"1999 / 12名", verified:true,
+    parts:[
+      {type:"row", names:["ルイージ","マリオ","ドンキーコング|DK","リンク","サムス","キャプテン・ファルコン|キャプテンファルコン|ファルコン|CF"]},
+      {type:"row", names:["ネス","ヨッシー","カービィ","フォックス","ピカチュウ","プリン"]}
+    ]
+  },
+  {
+    id:"smashdx", name:"スマブラDX", meta:"2001 / 25名", verified:true,
+    parts:[
+      {type:"row", names:["Dr.マリオ|ドクターマリオ|ドクマリ","マリオ","ルイージ","クッパ","ピーチ","ヨッシー","ドンキーコング|DK","キャプテン・ファルコン|キャプテンファルコン|ファルコン|CF","ガノンドロフ|ガノン"]},
+      {type:"row", names:["ファルコ","フォックス","ネス","アイスクライマー|アイクラ","カービィ","サムス","ゼルダ","リンク","こどもリンク|子リンク|こリン"]},
+      {type:"row", names:["ピチュー","ピカチュウ","プリン","ミュウツー","Mr.ゲーム&ウォッチ|ゲームアンドウォッチ|GW","マルス","ロイ"]}
+    ]
+  },
+  {
+    id:"ggxxslash", name:"GGXX SLASH", meta:"2005 / 25名", verified:true,
+    parts:[
+      {type:"circle", size:580, core:"AREA\nRANDOM", rings:[
+
+        /* 外周・上の弧（左から） */
+        {r:250, at:[-34,-17,0,17,34], names:[
+          "ジョニー","ブリジット","ロボカイ|ロボットカイ","スレイヤー","メイ"]},
+
+        /* 中央のリング。上2 / 右4 / 下2 / 左4 のかたまり */
+        {r:168, at:[-12,12, 54,78,102,126, 168,192, 234,258,282,306], names:[
+          "ソル|ソルバッドガイ","カイ|カイキスク",
+          "アクセル","闇慈|アンジ","梅喧|バイケン","エディ",
+          "ミリア","チップ",
+          "ファウスト","ジャム|紗夢","ポチョムキン|ポチョ","ヴェノム|ベノム"]},
+
+        /* 外周・下の弧（左から） */
+        {r:250, at:[214,197,180,163,146], names:[
+          "テスタメント","イノ","A.B.A|アバ","ザッパ","ディズィー"]},
+
+        /* 円周の内側 */
+        {r:88, from:0, names:[
+          "聖ソル|ホーリーオーダーソル|オーダーソル|オーソル","ジャスティス","クリフ"]}
+      ]}
+    ]
+  }
+];
+
+/* ========================================================================== */
+const app = document.getElementById("app");
+const PAR = 300;
+let GAMES = DATA.map(g=>JSON.parse(JSON.stringify(g)));
+let S = null;
+
+const shuffle = a => a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(p=>p[1]);
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const mmss = s => Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+
+function norm(s){
+  return String(s).toLowerCase()
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+    .replace(/[ぁ-ん]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60))
+    .replace(/[\s・･\-‐ー－=＝.。．、,，'"’”!！?？&＆()（）]/g,"");
+}
+const parse = s => { const p = String(s).split("|"); return {label:p[0], keys:p.map(norm)}; };
+const rawNames = g => g.parts.flatMap(p =>
+  p.type==="circle" ? p.rings.flatMap(r=>r.names) : p.names);
+const cellsOf = g => rawNames(g).map(parse);
+
+/* 自己ベスト。file:// や制限環境では黙って無効化 */
+const store = {
+  get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+const bestKey = (g,m) => `csm:best:${g.id}:${m}`;
+
+/* ---------- 盤面描画 ---------- */
+function board(g){
+  let i = 0;
+  const inner = p => {
+    const a = S.ans[p]||"";
+    if(!S.graded) return esc(a);
+    return esc(a||"—") + (S.mark[p] ? "" : `<b>${esc(S.cells[p].label)}</b>`);
+  };
+  const klass = p => "cell" + (S.ans[p]?" filled":"")
+    + (S.graded ? (S.mark[p]?" hit":" miss") : (p===S.active?" active":""));
+
+  const html = g.parts.map(part=>{
+    if(part.type==="row"){
+      const style = part.w ? ` style="max-width:${part.w}px"` : "";
+      return `<div class="row"${style}>${part.names.map(()=>{ const p=i++;
+        return `<button type="button" class="${klass(p)}" data-c="${p}">${inner(p)}</button>`;
+      }).join("")}</div>`;
+    }
+    const size = part.size||470, tw = 66, th = 50;
+    let t = "";
+    for(const ring of part.rings){
+      const step = 360/ring.names.length;
+      ring.names.forEach((_,k)=>{
+        const a = Array.isArray(ring.at) ? ring.at[k] : (ring.from||0) + step*k;
+        const p = i++;
+        t += `<button type="button" class="${klass(p)} rt" data-c="${p}" style="width:${tw}px;`
+           + `height:${th}px;margin:${-th/2}px 0 0 ${-tw/2}px;`
+           + `transform:rotate(${a}deg) translateY(${-ring.r}px);--back:${-a}deg">`
+           + `<span class="lb">${inner(p)}</span></button>`;
+      });
+    }
+    return `<div class="circlewrap"><div class="ringbox" style="width:${size}px;height:${size}px">`
+         + `<div class="core">${esc(part.core||"RANDOM").replace(/\n/g,"<br>")}</div>${t}</div></div>`;
+  }).join("");
+
+  return `<div class="parts">${html}</div>`;
+}
+
+function fit(){
+  app.querySelectorAll(".ringbox").forEach(rb=>{
+    const s = Math.min(1, rb.parentElement.clientWidth / parseFloat(rb.style.width));
+    rb.style.transform = `scale(${s})`;
+    rb.parentElement.style.height = (parseFloat(rb.style.height)*s)+"px";
+  });
+  app.querySelectorAll(".row[style]").forEach(r=>{
+    const parts = r.parentElement;
+    r.style.maxWidth = Math.min(parseFloat(r.dataset.w||r.style.maxWidth), parts.clientWidth)+"px";
+  });
+}
+addEventListener("resize", fit);
+
+/* ---------- 画面 ---------- */
+function title(){
+  clearInterval(S?.t);
+  app.innerHTML = `<div class="stage top">
+    <div class="list">${GAMES.map(g=>{
+      const b = ["drag","type"].map(m=>store.get(bestKey(g,m))).filter(Boolean);
+      const top = b.length ? Math.max(...b.map(x=>x.score)) : null;
+      return `<button data-g="${esc(g.id)}">
+        <span class="nm">${esc(g.name)}</span>
+        <span class="mt">${esc(g.meta||"")}${g.verified?"":" ⚠"}
+          ${top!=null?`<br>自己ベスト ${top}`:""}</span></button>`;
+    }).join("")}</div>
+    <p class="note">空のキャラ選択画面を、記憶だけで埋めてください。</p>
+    <div class="bar"><button id="ed">データを編集</button></div>
+  </div>`;
+  app.querySelectorAll("[data-g]").forEach(b=>
+    b.onclick=()=>modeSelect(GAMES.find(g=>g.id===b.dataset.g)));
+  document.getElementById("ed").onclick = editor;
+}
+
+function modeSelect(g){
+  const bd = store.get(bestKey(g,"drag")), bt = store.get(bestKey(g,"type"));
+  app.innerHTML = `<div class="stage top">
+    <div class="list">
+      <button class="col" data-m="drag">
+        <span class="nm">並べる</span>
+        <span class="ds">キャラ名が全部下に並びます。正しいマスへ置いてください。
+          ${bd?`<br>自己ベスト ${bd.score}点 / ${bd.hit}正解 / ${mmss(bd.sec)}`:""}</span></button>
+      <button class="col" data-m="type">
+        <span class="nm">記入する</span>
+        <span class="ds">選択肢はありません。マスを選んで名前を打ち込んでください。
+          ${bt?`<br>自己ベスト ${bt.score}点 / ${bt.hit}正解 / ${mmss(bt.sec)}`:""}</span></button>
+    </div>
+    <p class="note">${esc(g.name)} / 全${cellsOf(g).length}マス<br>
+      ${PAR}秒以内に終えると時間ボーナスが付きます。</p>
+    <div class="bar"><button id="bk">戻る</button></div>
+  </div>`;
+  app.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>start(g,b.dataset.m));
+  document.getElementById("bk").onclick = title;
+}
+
+function start(g, mode){
+  const cells = cellsOf(g);
+  S = { g, mode, cells, ans:cells.map(()=>null), mark:cells.map(()=>false),
+        pool:shuffle(cells.map(c=>c.label)), held:null, active:0, graded:false, sec:0, t:null };
+  S.t = setInterval(()=>{ S.sec++;
+    const e=document.getElementById("tm"); if(e) e.textContent = mmss(S.sec); },1000);
+  play();
+}
+
+function play(){
+  const left = S.ans.filter(a=>!a).length;
+  const used = new Set(S.ans.filter(Boolean));
+  const rest = S.pool.filter(n=>!used.has(n));
+
+  const ctrl = S.mode==="drag"
+    ? `<div class="pool">${rest.map(n=>
+        `<button type="button" class="chip${S.held===n?" sel":""}" data-p="${esc(n)}" draggable="true">${esc(n)}</button>`
+       ).join("") || '<span class="hint">手札は空です。答え合わせへどうぞ。</span>'}</div>
+       <p class="hint">名札をタップしてからマスをタップ、またはドラッグして置きます。<br>
+         置いたマスをもう一度タップすると手札に戻ります。</p>`
+    : `<div class="typer">
+         <input id="tx" placeholder="選択中のマスに入る名前" autocomplete="off" spellcheck="false">
+         <button class="chip" id="ok" style="padding:11px 16px">決定</button>
+       </div>
+       <p class="hint">Enterで確定し、次の空きマスへ進みます。表記ゆれや別名も判定します。</p>`;
+
+  app.innerHTML = `
+    <div class="status">
+      <div><span class="k">残り</span><span class="v">${left}</span></div>
+      <div><span class="k">TIME</span><span class="v" id="tm">${mmss(S.sec)}</span></div>
+    </div>
+    <div class="stage">
+      ${board(S.g)}
+      ${ctrl}
+      <div class="bar">
+        <button class="go" id="gr">答え合わせ</button>
+        <button id="qt">やめる</button>
+      </div>
+    </div>`;
+  fit();
+  bind();
+}
+
+function bind(){
+  app.querySelectorAll("[data-c]").forEach(el=>{
+    const p = +el.dataset.c;
+    el.onclick = ()=>{
+      if(S.mode==="drag"){
+        if(S.ans[p]){ S.ans[p]=null; play(); return; }
+        if(S.held){ S.ans[p]=S.held; S.held=null; play(); }
+      }else{
+        S.active = p; play();
+        const tx = document.getElementById("tx");
+        if(tx){ tx.value = S.ans[p]||""; tx.focus(); tx.select(); }
+      }
+    };
+    if(S.mode!=="drag") return;
+    el.ondragover = e=>{ e.preventDefault(); el.classList.add("over"); };
+    el.ondragleave = ()=> el.classList.remove("over");
+    el.ondrop = e=>{ e.preventDefault();
+      const n = e.dataTransfer.getData("text/plain");
+      if(n){ S.ans[p]=n; S.held=null; play(); } };
+  });
+
+  app.querySelectorAll("[data-p]").forEach(el=>{
+    const n = el.dataset.p;
+    el.onclick = ()=>{ S.held = (S.held===n ? null : n); play(); };
+    el.ondragstart = e=>{ e.dataTransfer.setData("text/plain", n); S.held=null; };
+  });
+
+  const tx = document.getElementById("tx");
+  if(tx){
+    const commit = ()=>{
+      const v = tx.value.trim();
+      if(v && S.active!=null){
+        S.ans[S.active] = v;
+        let n = S.ans.findIndex((a,i)=>!a && i>S.active);
+        if(n<0) n = S.ans.findIndex(a=>!a);
+        if(n>=0) S.active = n;
+      }
+      play();
+      const t2 = document.getElementById("tx"); if(t2) t2.focus();
+    };
+    tx.onkeydown = e=>{ if(e.key==="Enter" && !e.isComposing){ e.preventDefault(); commit(); } };
+    document.getElementById("ok").onclick = commit;
+    tx.focus();
+  }
+  document.getElementById("gr").onclick = grade;
+  document.getElementById("qt").onclick = ()=>{ clearInterval(S.t); title(); };
+}
+
+function grade(){
+  clearInterval(S.t);
+  S.graded = true; S.active = null;
+  S.mark = S.cells.map((c,i)=> !!S.ans[i] && c.keys.includes(norm(S.ans[i])));
+  const hit = S.mark.filter(Boolean).length, n = S.cells.length;
+  const bonus = Math.round(Math.max(0, PAR - S.sec) * (hit/n));
+  const score = hit*100 + bonus;
+
+  const key = bestKey(S.g, S.mode), prev = store.get(key);
+  const isBest = !prev || score > prev.score;
+  if(isBest) store.set(key, {score, hit, sec:S.sec});
+
+  app.innerHTML = `
+    <div class="status">
+      <div><span class="k">正解</span><span class="v">${hit}/${n}</span></div>
+      <div><span class="k">TIME</span><span class="v">${mmss(S.sec)}</span></div>
+    </div>
+    <div class="stage">
+      ${board(S.g)}
+      <div class="result">
+        <p class="lbl">SCORE</p><p class="big">${score}</p>
+        <p class="det">正解 ${hit}×100 ＋ 時間ボーナス ${bonus}
+          ${isBest?'<br><span class="flag">自己ベスト更新</span>':(prev?`<br>自己ベスト ${prev.score}`:"")}</p>
+      </div>
+      <div class="bar">
+        <button class="go" id="rt">もう一度</button>
+        <button id="hm">タイトルへ</button>
+      </div>
+    </div>`;
+  fit();
+  document.getElementById("rt").onclick = ()=>start(S.g, S.mode);
+  document.getElementById("hm").onclick = title;
+}
+
+function editor(){
+  app.innerHTML = `<div class="stage top">
+    <p class="help">
+      <code>parts</code> に行と円を上から順に積みます。<br>
+      <code>{type:"row", w:470, names:[…]}</code> … w は行の最大幅(px)。省略で横いっぱい。<br>
+      <code>{type:"circle", size:470, core:"…", rings:[{r,from,names}]}</code><br>
+      　<code>r</code>=中心からの距離、<code>from</code>=開始角度(0が真上・時計回り)で等間隔。<br>
+      　<code>at:[角度,…]</code> を使うと1枚ずつ配置でき、かたまりや弧が作れます。<br>
+      キャラ名は <code>"ソル|ソルバッドガイ"</code> で別表記も正解になります。
+    </p>
+    <textarea id="ta" spellcheck="false"></textarea>
+    <div class="msg" id="ms"></div>
+    <div class="bar"><button id="ap">反映</button><button id="dl">保存</button>
+      <button id="rs">初期値に戻す</button><button id="bk">戻る</button></div>
+  </div>`;
+  const ta = document.getElementById("ta"), ms = document.getElementById("ms");
+  ta.value = JSON.stringify(GAMES,null,2);
+  document.getElementById("ap").onclick = ()=>{
+    try{
+      const v = JSON.parse(ta.value);
+      if(!Array.isArray(v)) throw new Error("配列にしてください");
+      v.forEach((g,i)=>{
+        if(!g.id||!g.name) throw new Error(`${i+1}番目に id か name がありません`);
+        if(!Array.isArray(g.parts)) throw new Error(`${g.name}: parts が配列ではありません`);
+        g.parts.forEach(p=>{
+          if(p.type==="circle"){ if(!Array.isArray(p.rings)) throw new Error(`${g.name}: rings が配列ではありません`); }
+          else if(!Array.isArray(p.names)) throw new Error(`${g.name}: names が配列ではありません`);
+        });
+      });
+      GAMES = v; ms.className="msg good"; ms.textContent="反映しました。タイトルへ戻ると遊べます。";
+    }catch(e){ ms.className="msg bad"; ms.textContent="エラー: "+e.message; }
+  };
+  document.getElementById("dl").onclick = ()=>{
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([ta.value],{type:"application/json"}));
+    a.download = "charaselect-data.json"; a.click();
+  };
+  document.getElementById("rs").onclick = ()=>{
+    GAMES = DATA.map(g=>JSON.parse(JSON.stringify(g)));
+    ta.value = JSON.stringify(GAMES,null,2);
+    ms.className="msg good"; ms.textContent="初期値に戻しました。";
+  };
+  document.getElementById("bk").onclick = title;
+}
+
+title();
+</script>
+</body>
+</html>
