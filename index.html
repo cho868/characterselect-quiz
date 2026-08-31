@@ -1,8 +1,17 @@
 <!DOCTYPE html>
 <html lang="ja">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
 <title>キャラセレ記憶 — CHARA SELECT MEMORY</title>
+<meta name="description" content="対戦ゲームのキャラクター選択画面を、記憶だけで復元するブラウザゲーム。空の盤面を並べるか打ち込むかして、正確さと速さを競います。">
+<meta name="theme-color" content="#15132a">
+<meta property="og:type" content="website">
+<meta property="og:title" content="キャラセレ記憶">
+<meta property="og:description" content="キャラクター選択画面を記憶だけで復元するブラウザゲーム。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2315132a'/%3E%3Cg fill='%232f2c55'%3E%3Crect x='4' y='6' width='10' height='8'/%3E%3Crect x='18' y='6' width='10' height='8'/%3E%3Crect x='4' y='18' width='10' height='8'/%3E%3C/g%3E%3Crect x='18' y='18' width='10' height='8' fill='none' stroke='%23f2b33d' stroke-width='2'/%3E%3C/svg%3E">
 <style>
   :root{
     --bg:#15132a; --panel:#201e3c; --tile:#2f2c55; --tile-lo:#191634;
@@ -98,15 +107,9 @@
     border:1px solid var(--edge);box-shadow:2px 2px 0 var(--tile-lo);padding:11px 20px;cursor:pointer}
   .bar button.go{background:var(--amber);color:#241a05;border-color:var(--amber)}
   .bar button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
-  textarea{width:100%;height:340px;background:var(--tile-lo);color:var(--ink);
-    border:1px solid var(--edge);padding:10px;font-family:ui-monospace,Menlo,Consolas,monospace;
-    font-size:12px;line-height:1.6;resize:vertical}
-  .msg{margin-top:10px;font-size:12px;min-height:1.2em}
-  .msg.bad{color:var(--p1)} .msg.good{color:var(--ok)}
-  .help{font-size:11.5px;line-height:1.8;color:var(--dim);margin-bottom:10px}
-  .help code{color:var(--amber);font-family:ui-monospace,monospace}
   footer{margin-top:14px;font-size:10.5px;line-height:1.8;color:#5f5a86;text-align:center}
 </style>
+</head>
 
 <body>
 <div class="cab">
@@ -182,7 +185,7 @@ const DATA = [
 /* ========================================================================== */
 const app = document.getElementById("app");
 const PAR = 300;
-let GAMES = DATA.map(g=>JSON.parse(JSON.stringify(g)));
+let GAMES = DATA;
 let S = null;
 
 const shuffle = a => a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(p=>p[1]);
@@ -271,11 +274,9 @@ function title(){
           ${top!=null?`<br>自己ベスト ${top}`:""}</span></button>`;
     }).join("")}</div>
     <p class="note">空のキャラ選択画面を、記憶だけで埋めてください。</p>
-    <div class="bar"><button id="ed">データを編集</button></div>
   </div>`;
   app.querySelectorAll("[data-g]").forEach(b=>
     b.onclick=()=>modeSelect(GAMES.find(g=>g.id===b.dataset.g)));
-  document.getElementById("ed").onclick = editor;
 }
 
 function modeSelect(g){
@@ -422,51 +423,6 @@ function grade(){
   fit();
   document.getElementById("rt").onclick = ()=>start(S.g, S.mode);
   document.getElementById("hm").onclick = title;
-}
-
-function editor(){
-  app.innerHTML = `<div class="stage top">
-    <p class="help">
-      <code>parts</code> に行と円を上から順に積みます。<br>
-      <code>{type:"row", w:470, names:[…]}</code> … w は行の最大幅(px)。省略で横いっぱい。<br>
-      <code>{type:"circle", size:470, core:"…", rings:[{r,from,names}]}</code><br>
-      　<code>r</code>=中心からの距離、<code>from</code>=開始角度(0が真上・時計回り)で等間隔。<br>
-      　<code>at:[角度,…]</code> を使うと1枚ずつ配置でき、かたまりや弧が作れます。<br>
-      キャラ名は <code>"ソル|ソルバッドガイ"</code> で別表記も正解になります。
-    </p>
-    <textarea id="ta" spellcheck="false"></textarea>
-    <div class="msg" id="ms"></div>
-    <div class="bar"><button id="ap">反映</button><button id="dl">保存</button>
-      <button id="rs">初期値に戻す</button><button id="bk">戻る</button></div>
-  </div>`;
-  const ta = document.getElementById("ta"), ms = document.getElementById("ms");
-  ta.value = JSON.stringify(GAMES,null,2);
-  document.getElementById("ap").onclick = ()=>{
-    try{
-      const v = JSON.parse(ta.value);
-      if(!Array.isArray(v)) throw new Error("配列にしてください");
-      v.forEach((g,i)=>{
-        if(!g.id||!g.name) throw new Error(`${i+1}番目に id か name がありません`);
-        if(!Array.isArray(g.parts)) throw new Error(`${g.name}: parts が配列ではありません`);
-        g.parts.forEach(p=>{
-          if(p.type==="circle"){ if(!Array.isArray(p.rings)) throw new Error(`${g.name}: rings が配列ではありません`); }
-          else if(!Array.isArray(p.names)) throw new Error(`${g.name}: names が配列ではありません`);
-        });
-      });
-      GAMES = v; ms.className="msg good"; ms.textContent="反映しました。タイトルへ戻ると遊べます。";
-    }catch(e){ ms.className="msg bad"; ms.textContent="エラー: "+e.message; }
-  };
-  document.getElementById("dl").onclick = ()=>{
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([ta.value],{type:"application/json"}));
-    a.download = "charaselect-data.json"; a.click();
-  };
-  document.getElementById("rs").onclick = ()=>{
-    GAMES = DATA.map(g=>JSON.parse(JSON.stringify(g)));
-    ta.value = JSON.stringify(GAMES,null,2);
-    ms.className="msg good"; ms.textContent="初期値に戻しました。";
-  };
-  document.getElementById("bk").onclick = title;
 }
 
 title();
