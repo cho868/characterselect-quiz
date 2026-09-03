@@ -63,6 +63,9 @@
   .cols{display:flex;gap:5px;justify-content:center;width:100%;align-items:flex-start}
   .colstack{display:flex;flex-direction:column;gap:5px;flex:1 1 0;min-width:0}
   .colstack .cell{min-height:48px;font-size:10.5px;box-shadow:2px 2px 0 var(--tile-lo)}
+  .cols.oval .cell{border-radius:50%;width:64px;height:70px;min-height:0;align-self:center;
+    padding:2px;font-size:9.5px;box-shadow:none}
+  .cols.oval .cell.active::after{border-radius:50%;inset:-4px}
   .cell.locked{background:var(--tile-lo);color:#5f5a86;cursor:default;font-size:9.5px;
     box-shadow:none}
 
@@ -321,15 +324,16 @@ const DATA = [
   {
     id:"sf3_3rd", name:"ストリートファイターIII 3rd STRIKE", meta:"1999 / 19名（ギルを除く）", verified:true,
     parts:[
-      /* 楕円配置。中央列が7名で、上下に半マスずつはみ出す */
-      {type:"cols", w:440, columns:[
-        {dy:27, names:[
+      /* 楕円配置。中央列が7名で、上下に半マスずつはみ出す。
+         shape:"oval" で枠を楕円に、tilt で全体を傾ける（符号で向きが変わる） */
+      {type:"cols", w:230, shape:"oval", tilt:8, columns:[
+        {dy:38, names:[
           "豪鬼|ごうき|Akuma|Gouki","ユリアン|Urien","ネクロ|Necro",
           "いぶき|Ibuki","ショーン|Sean","アレックス|Alex"]},
         {dy:0, names:[
           "ユン|Yun","レミー|Remy","Q|キュー","春麗|チュンリー|Chun-Li",
           "まこと|Makoto","トゥエルヴ|トゥエルブ|Twelve","ヤン|Yang"]},
-        {dy:27, names:[
+        {dy:38, names:[
           "リュウ|Ryu","オロ|Oro","ダッドリー|Dudley",
           "エレナ|Elena","ヒューゴー|ヒューゴ|Hugo","ケン|Ken"]}
       ]}
@@ -408,8 +412,14 @@ function board(g){
 
   const html = g.parts.map(part=>{
     if(part.type==="cols"){
-      const st = part.w ? ` style="max-width:${part.w}px"` : "";
-      return `<div class="cols"${st}>${part.columns.map(col=>{
+      const cls = "cols" + (part.shape==="oval" ? " oval" : "");
+      const rot = part.tilt ? `transform:rotate(${part.tilt}deg);` : "";
+      /* 回転した分だけ上下に余白を足して、隣の要素と重ならないようにする */
+      const mg = part.tilt
+        ? `margin:${Math.round(Math.abs(Math.sin(part.tilt*Math.PI/180))*(part.w||440)/2)+8}px 0;`
+        : "";
+      const st = (part.w?`max-width:${part.w}px;`:"") + rot + mg;
+      return `<div class="${cls}"${st?` style="${st}"`:""}>${part.columns.map(col=>{
         const cs = col.dy ? ` style="margin-top:${col.dy}px"` : "";
         return `<div class="colstack"${cs}>${col.names.map(n=>{
           if(!n) return `<div class="spacer" style="min-height:48px"></div>`;
