@@ -60,6 +60,9 @@
   .row .cell,.row .spacer{flex:1 1 0;min-width:0}
   .row.grid>.cell,.row.grid>.spacer{flex:0 0 calc((100% - (var(--cols) - 1) * 5px) / var(--cols))}
   .row .cell{min-height:48px;font-size:10.5px;box-shadow:2px 2px 0 var(--tile-lo)}
+  .cols{display:flex;gap:5px;justify-content:center;width:100%;align-items:flex-start}
+  .colstack{display:flex;flex-direction:column;gap:5px;flex:1 1 0;min-width:0}
+  .colstack .cell{min-height:48px;font-size:10.5px;box-shadow:2px 2px 0 var(--tile-lo)}
   .cell.locked{background:var(--tile-lo);color:#5f5a86;cursor:default;font-size:9.5px;
     box-shadow:none}
 
@@ -314,6 +317,49 @@ const DATA = [
         "イングリッド|Ingrid"]},
       {type:"row", w:560, cols:4, names:["ヤスミン|Yasmin"]}
     ]
+  },
+  {
+    id:"sf3_3rd", name:"ストリートファイターIII 3rd STRIKE", meta:"1999 / 19名（ギルを除く）", verified:true,
+    parts:[
+      /* 楕円配置。中央列が7名で、上下に半マスずつはみ出す */
+      {type:"cols", w:440, columns:[
+        {dy:27, names:[
+          "豪鬼|ごうき|Akuma|Gouki","ユリアン|Urien","ネクロ|Necro",
+          "いぶき|Ibuki","ショーン|Sean","アレックス|Alex"]},
+        {dy:0, names:[
+          "ユン|Yun","レミー|Remy","Q|キュー","春麗|チュンリー|Chun-Li",
+          "まこと|Makoto","トゥエルヴ|トゥエルブ|Twelve","ヤン|Yang"]},
+        {dy:27, names:[
+          "リュウ|Ryu","オロ|Oro","ダッドリー|Dudley",
+          "エレナ|Elena","ヒューゴー|ヒューゴ|Hugo","ケン|Ken"]}
+      ]}
+    ]
+  },
+  {
+    id:"gradius3_sfc", name:"グラディウスIII (SFC) 武器選択", meta:"1990 / 24種", verified:true,
+    parts:[
+      /* 1行目は列の見出し。選択対象は6カテゴリ×4種の24種 */
+      {type:"row", w:660, cols:6, names:[
+        "=ミサイル","=ダブル","=レーザー","=オプション","=？","=！"]},
+      {type:"row", w:660, cols:6, names:[
+        "ミサイル|Missile","バーティカル|バーチカル|Vertical","ツインレーザー|ツイン|Twin Laser",
+        "オプション|Option","シールド|Shield","スピードダウン|Speed Down"]},
+      {type:"row", w:660, cols:6, names:[
+        "ホークウィンド|ホークウインド|Hawk Wind","ダブル|Double","リップル|リップルレーザー|Ripple",
+        "S.オプション|Sオプション|スネークオプション|スネーク|Snake Option|S.Option",
+        "フォースフィールド|Force Field",
+        "リメインオプション|Remain Option|リメイン"]},
+      {type:"row", w:660, cols:6, names:[
+        "2way back|2WAYバック|ツーウェイバック|2 Way Back","テイルガン|テールガン|Tailgun",
+        "E.レーザー|Eレーザー|エナジーレーザー|エナジー|Energy Laser|E.Laser",
+        "F.オプション|Fオプション|フォーメーションオプション|フォーメーション|Formation Option|F.Option",
+        "Rシールド|R.シールド|R.Shield","フルバリア|Full Barrier"]},
+      {type:"row", w:660, cols:6, names:[
+        "スモールスプレッド|Small Spread","バックダブル|Back Double",
+        "C.レーザー|Cレーザー|サイクロンレーザー|サイクロン|Cyclone Laser|C.Laser",
+        "R.オプション|Rオプション|ローリングオプション|ローリング|Rolling Option|R.Option",
+        "レデュース|Reduce","メガクラッシュ|Mega Crush"]}
+    ]
   }
 ];
 
@@ -331,11 +377,14 @@ function norm(s){
   return String(s).toLowerCase()
     .replace(/[Ａ-Ｚａ-ｚ０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
     .replace(/[ぁ-ん]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60))
-    .replace(/[\s・･\-‐ー－=＝.。．、,，'"’”!！?？&＆()（）]/g,"");
+    .replace(/？/g,"?").replace(/！/g,"!")
+    .replace(/[\s・･\-‐ー－=＝.。．、,，'"’”&＆()（）]/g,"");
 }
 const parse = s => { const p = String(s).split("|"); return {label:p[0], keys:p.map(norm)}; };
 const rawNames = g => g.parts.flatMap(p =>
-  p.type==="circle" ? p.rings.flatMap(r=>r.names) : p.names)
+    p.type==="circle" ? p.rings.flatMap(r=>r.names)
+  : p.type==="cols"   ? p.columns.flatMap(c=>c.names)
+  : p.names)
   .filter(n => n && String(n)[0]!=="=");
 const cellsOf = g => rawNames(g).map(parse);
 
@@ -358,6 +407,18 @@ function board(g){
     + (S.graded ? (S.mark[p]?" hit":" miss") : (p===S.active?" active":""));
 
   const html = g.parts.map(part=>{
+    if(part.type==="cols"){
+      const st = part.w ? ` style="max-width:${part.w}px"` : "";
+      return `<div class="cols"${st}>${part.columns.map(col=>{
+        const cs = col.dy ? ` style="margin-top:${col.dy}px"` : "";
+        return `<div class="colstack"${cs}>${col.names.map(n=>{
+          if(!n) return `<div class="spacer" style="min-height:48px"></div>`;
+          if(String(n)[0]==="=") return `<div class="cell locked">${esc(String(n).slice(1))}</div>`;
+          const p=i++;
+          return `<button type="button" class="${klass(p)}" data-c="${p}">${inner(p)}</button>`;
+        }).join("")}</div>`;
+      }).join("")}</div>`;
+    }
     if(part.type==="row"){
       const st = (part.w?`max-width:${part.w}px;`:"") + (part.cols?`--cols:${part.cols}`:"");
       const cls = "row" + (part.cols?" grid":"");
